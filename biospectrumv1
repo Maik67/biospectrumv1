@@ -1,0 +1,177 @@
+#define pin_e1 2  
+#define pin_e2 3    
+#define pin_by 4      
+#define logo "BIOSPECTRUM V1" 
+#define autor "Autor Tukhuzheva Zh.Z"
+
+#define pin_d1 5  
+#define pin_d2 6  
+#define pin_d3 7  
+#define pin_d4 8  
+#define pin_d5 9  
+#define pin_d6 10 
+#define pin_d7 11 
+
+#include <Arduino.h>
+
+#include <EncButton.h>
+EncButton eb(pin_e1, pin_e2, pin_by);
+
+#include <LiquidCrystal_I2C.h>
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+uint8_t menu, vid_diod;
+uint32_t tik = 0, tmr;
+String hh, mm, ss;
+const char *menu_d[] = {"Red", "Blue", "Orange", "Yellow", "Green", "IR", "UV"};
+uint8_t pin_d[] = {pin_d1, pin_d2, pin_d3, pin_d4, pin_d5, pin_d6, pin_d7};
+
+void LCD();
+void time();
+
+void setup()
+{
+  pinMode(pin_d1, OUTPUT);
+  pinMode(pin_d2, OUTPUT);
+  pinMode(pin_d3, OUTPUT);
+  pinMode(pin_d4, OUTPUT);
+  pinMode(pin_d5, OUTPUT);
+  pinMode(pin_d6, OUTPUT);
+  pinMode(pin_d7, OUTPUT);
+
+  lcd.init();          
+  lcd.backlight();     
+  lcd.setCursor(5, 0);
+  lcd.print(logo);
+  delay(3000);
+  lcd.print(autor);
+  delay(3000);
+  LCD();
+}
+
+void loop()
+{
+  eb.tick();
+  if (eb.hasClicks(1))
+  {
+    menu < 3 ? menu++ : menu;
+    menu == 4 ? menu = 0 : menu;
+    LCD();
+  }
+
+  if (eb.hasClicks(2))
+  {
+    menu > 0 && menu < 2 ? menu-- : menu;
+    LCD();
+  }
+
+  if (eb.turn())
+  {
+    switch (menu)
+    {
+    case 0:
+      eb.dir() > 0 &&vid_diod < 6 ? vid_diod += 1 * eb.dir() : vid_diod;
+      eb.dir()<0 &&vid_diod> 0 ? vid_diod += 1 * eb.dir() : vid_diod;
+      break;
+
+    case 1:
+      eb.dir() > 0 ? tik += (eb.fast() ? 10 : 1) * eb.dir() : tik;
+      eb.dir()<0 &&tik> 0 ? tik += (eb.fast() ? 60 : 1) * eb.dir() : tik;
+      break;
+    }
+    LCD();
+  }
+
+  if (menu == 3)
+  {
+    digitalWrite(pin_d[vid_diod], HIGH);
+    while (1)
+    {
+      eb.tick();
+      if (eb.hold())
+      {
+        menu = 0;
+        tik = 0;
+        time();
+        digitalWrite(pin_d[vid_diod], LOW);
+        LCD();
+        break;
+      }
+
+      if (millis() - tmr > 1000)
+      {
+        tmr = millis();
+        if (tik > 0)
+        {
+          tik--;
+        }
+        else
+        {
+          menu = 4;
+          digitalWrite(pin_d[vid_diod], LOW);
+          LCD();
+          break;
+        }
+        time();
+        LCD();
+      }
+    }
+  }
+}
+
+void LCD()
+{
+  time();
+  switch (menu)
+  {
+  case 0:
+    lcd.clear();
+    lcd.setCursor(1, 0);
+    lcd.print("Select mode :");
+    // lcd.print(vid_diod);
+    lcd.setCursor(6, 1);
+    lcd.print(menu_d[vid_diod]);
+    break;
+
+  case 1:
+    lcd.clear();
+    lcd.setCursor(5, 0);
+    lcd.print("Time :");
+    // lcd.print(tik);
+    lcd.setCursor(4, 1);
+    lcd.print(String(hh) + ":" + String(mm) + ":" + String(ss));
+    break;
+
+  case 2:
+    lcd.clear();
+    lcd.setCursor(1, 0);
+    lcd.print("press to start");
+    // lcd.print(tik);
+    lcd.setCursor(0, 1);
+    lcd.print(String(hh) + ":" + String(mm) + ":" + String(ss) + "  " + menu_d[vid_diod]);
+    break;
+
+  case 3:
+    lcd.clear();
+    lcd.setCursor(3, 0);
+    lcd.print(String(menu_d[vid_diod]) + "  On");
+    lcd.setCursor(3, 1);
+    lcd.print(hh + ":" + mm + ":" + ss);
+    break;
+
+  case 4:
+    lcd.clear();
+    lcd.setCursor(3, 0);
+    lcd.print(String(menu_d[vid_diod]) + "  Off");
+    lcd.setCursor(1, 1);
+    lcd.print("Press to exit");
+    break;
+  }
+}
+
+void time()
+{
+  hh = tik / 3600 > 9 ? String(tik / 3600) : "0" + String(tik / 3600);
+  mm = ((tik % 3600) / 60) > 9 ? String((tik % 3600) / 60) : "0" + String((tik % 3600) / 60);
+  ss = ((tik % 3600) % 60) > 9 ? String((tik % 3600) % 60) : "0" + String((tik % 3600) % 60);
+}
